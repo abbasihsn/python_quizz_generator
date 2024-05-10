@@ -1,4 +1,4 @@
-from moviepy.editor import ImageSequenceClip, VideoFileClip, concatenate_videoclips, AudioFileClip
+from moviepy.editor import ImageSequenceClip, VideoFileClip, concatenate_videoclips, AudioFileClip, TextClip, ImageClip, CompositeAudioClip
 from PIL import Image, ImageDraw, ImageFont
 import os
 import numpy as np
@@ -6,7 +6,7 @@ import re
 
 
 
-def create_clip(video_name, images, fps=5, has_end_pause=False, last_frame_pause_per_second=2, save_video=False):
+def create_clip(video_name, images, fps=5, has_end_pause=False, last_frame_pause_per_second=2, save_video=False, audio_path=None):
     # Convert PIL Images to numpy arrays
     image_arrays = [np.array(img) for img in images]
 
@@ -18,6 +18,11 @@ def create_clip(video_name, images, fps=5, has_end_pause=False, last_frame_pause
     
     # Create video clip from image arrays
     clip = ImageSequenceClip(image_arrays, fps=fps)
+    if audio_path:
+        audio_clip = AudioFileClip(audio_path)
+        audio_duration = clip.duration  # Duration of the video
+        audio_clip = audio_clip.set_duration(audio_duration)  # Match the audio duration with the video
+        clip = clip.set_audio(audio_clip)  # Set the audio to the video
 
     # Export the video
     if save_video:
@@ -86,7 +91,7 @@ def create_image_with_overlay(bg_path, overlay_path, frame_size=(1080, 1920), h_
         # Add text above the logo
         text_width = draw.textlength(logo_top_text, font=font)
         text_position = ((frame_size[0] - text_width) // 2, frame_size[1] - bottom_offset - font_size - 10)
-        draw.text(text_position, logo_top_text, font=font, fill="gray")
+        draw.text(text_position, logo_top_text, font=font, fill=logo_top_text_color)
         
         # Add text below the logo
         text_width = draw.textlength(logo_bottom_text, font=font)
@@ -275,17 +280,67 @@ def generate_answer_image(bg_image, checkmark_path, answer_image_path, answer_id
 
     return img
 
-def generate_final_video(video_name, video_list, audio_path):
+def generate_countdown_timer(background_image, font_path, beep_sound_path, counter_position=(540, 1250), duration=5, font_size=150, bg_color=(0, 0, 0), text_color=(255, 255, 255), fps=24, save_video=False, video_name = "counter_video.mp4"):
+    """
+    Generates a countdown video clip from `duration` to 1.
+
+    :param duration: The number of seconds for the countdown.
+    :param font_path: Path to the font file.
+    :param font_size: Size of the font for the countdown numbers.
+    :param bg_color: Background color as a tuple (R, G, B).
+    :param text_color: Text color as a tuple (R, G, B).
+    :param fps: Frames per second of the countdown clip.
+    :return: A MoviePy VideoFileClip object of the countdown.
+    """
+    countdown_clips = []
+    beep_sound = AudioFileClip(beep_sound_path).set_duration(1)
+    font = ImageFont.truetype(font_path, font_size)
+    for i in range(duration, 0, -1):
+        # Create an image with text
+        img = background_image.copy()
+        draw = ImageDraw.Draw(img)
+        text = str(i)
+        text_width = draw.textlength(text, font=font)
+        position = counter_position[0]-text_width//2, counter_position[1] - font_size//2
+        draw.text(position, text, font=font, fill=text_color)
+        
+        # Convert PIL image to MoviePy clip
+        clip = ImageClip(np.array(img)).set_duration(1).set_fps(fps).set_audio(beep_sound)
+        countdown_clips.append(clip)
+    
+    # Concatenate all clips into one
+    countdown_video = concatenate_videoclips(countdown_clips)
+    # Export the video
+    if save_video:
+        countdown_video.write_videofile(video_name, codec="libx264")
+    return countdown_video
+
+
+def generate_final_video(video_name, video_list, audio_path=None, save_video=False, keep_counter_sound=False):
     # Concatenate the videos
     final_video = concatenate_videoclips(video_list)
 
-    # Load the audio file
-    background_music = AudioFileClip(audio_path)
-    # Set the duration of the music equal to the duration of the final video
-    background_music = background_music.set_duration(final_video.duration)
-    
-    # Set the audio of the concatenated video to be the background music
-    final_video = final_video.set_audio(background_music)
+    # If an audio path is provided, load it
+    if audio_path:
+        final_audio = AudioFileClip(audio_path)
+
+        if keep_counter_sound:
+            final_audio = final_audio.set_duration(final_video.duration)
+            final_audio_fadeout = final_audio.subclip(0, video_list[0].duration+2).audio_fadeout(4)  # 2 seconds fade out
+            final_audio_fadein = final_audio.subclip(video_list[0].duration+video_list[1].duration, final_audio.duration).audio_fadein(2)
+            correct_answer_audio = AudioFileClip("./assets/correct_answer/1.mp3")
+            # Combine the audio clips with fade effects
+            final_audio = CompositeAudioClip([final_audio_fadeout.set_end(video_list[0].duration+2),  
+                video_list[1].audio.set_start(video_list[0].duration).set_end(video_list[0].duration+video_list[1].duration), 
+                correct_answer_audio.set_start(video_list[0].duration+video_list[1].duration),
+                final_audio_fadein.set_start(video_list[0].duration+video_list[1].duration).set_end(final_audio.duration)])
+
+
+        # Set the audio of the final video to be the combined audio
+        final_video = final_video.set_audio(final_audio)
 
     # Write the result to a file
-    final_video.write_videofile(video_name, codec='libx264', audio_codec='aac')
+    if save_video:
+        final_video.write_videofile(video_name, codec='libx264', audio_codec='aac')
+
+    return final_video
