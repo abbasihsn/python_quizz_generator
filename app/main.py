@@ -1,6 +1,7 @@
 import utils as utils
 from PIL import ImageFont, Image
-# code lines
+
+# ----------------------------------- Question Parameters ------------------------------------------------------------
 code_lines = ['numbers = [1, 2, 3, 4, 5]', 'result = [n * 2 for n in numbers', '        if n % 2 == 1]', 'print(result)', '', "", "# what is the result?"]
 # Define the choices
 choices = ["A. [2, 4, 6, 8, 10]", "B. [2, 6, 10]", "C. [1, 3, 5, 7, 9]", "D. [3, 5, 7]"]
@@ -18,10 +19,11 @@ font_path = "./assets/fonts/ARLRDBD.ttf"  # Adjust this path to the font you wan
 font_size = 55
 font = ImageFont.truetype(font_path, font_size)
 
-# window code animation
-background_image_path = './assets/background_images/3.jpg'
+# assets
+background_image_path = utils.get_random_background('./assets/background_images')
 overlay_image_path = './assets/code_window.png'
 logo_path = './assets/language_logo/python.png'
+audio_path = utils.get_random_audio("./assets/musics")
 
 window_code_images = utils.create_code_window_animation(background_image_path=background_image_path, overlay_image_path=overlay_image_path,
     font_path=font_path, logo_top_text=level, logo_top_text_color=level_color, logo_path=logo_path, logo_size=300, font_size=50, bottom_offset=500)
@@ -45,7 +47,6 @@ countdown_clip = utils.generate_countdown_timer(background_image=choices_animati
 answer_img = utils.generate_answer_image(choices_animation_images[-1].copy(), './assets/checkmarks/1.png', "./assets/choice_answer.png", answer_idx, choices, font_path, padding=padding, v_padding=v_padding, v_padding_step=v_padding_step)
 
 # generate video
-audio_path = "./assets/musics/2.mp3"
 window_code_images_clip = utils.create_clip("window_code_images_clip.mp4", window_code_images, fps=60, has_end_pause = False)
 code_typing_images_clip = utils.create_clip("code_typing_images_clip.mp4", code_typing_images, fps=13, has_end_pause = False)
 choices_animation_images_clip = utils.create_clip("choices_animation_images_clip.mp4", choices_animation_images, fps=30, has_end_pause = False)

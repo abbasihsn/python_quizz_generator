@@ -1,6 +1,7 @@
 from moviepy.editor import ImageSequenceClip, VideoFileClip, concatenate_videoclips, AudioFileClip, TextClip, ImageClip, CompositeAudioClip
 from PIL import Image, ImageDraw, ImageFont
 import os
+import random
 import numpy as np
 import re
 
@@ -31,7 +32,7 @@ def create_clip(video_name, images, fps=5, has_end_pause=False, last_frame_pause
     print(f"{video_name} created!")
     return clip
 
-def create_image_with_overlay(bg_path, overlay_path, frame_size=(1080, 1920), h_padding=50, v_padding=50, overlay_shift=0,
+def create_image_with_overlay(bg_path, overlay_path, frame_size=(1080, 1920), h_padding=50, v_padding=50, overlay_shift=0, channel_logo_path=None, channel_logo_x = 100, channel_logo_y_offset = 0,
     logo_top_text="", logo_top_text_color = "red", logo_bottom_text="", logo_bottom_text_color = "red", logo_path=None, logo_size=200, bottom_offset=300, font_path="", font_size=20):
     """
     Loads a background image and an overlay image, combines them, and saves or displays the result.
@@ -63,12 +64,13 @@ def create_image_with_overlay(bg_path, overlay_path, frame_size=(1080, 1920), h_
     bg_image.paste(overlay_image, overlay_position, overlay_image)  # Use overlay_image as a mask for transparency
 
     # add channel logo
-    channel_logo_img = Image.open("./assets/logo.png").convert("RGBA")
-    original_channel_logo_width, original_channel_logo_height = channel_logo_img.size
-    new_channel_logo_width = 60
-    new_channel_logo_height = int(original_channel_logo_height * (new_channel_logo_width / original_channel_logo_width))
-    channel_logo_img = channel_logo_img.resize((new_channel_logo_width, new_channel_logo_height), Image.Resampling.LANCZOS)
-    bg_image.paste(channel_logo_img, (10, frame_size[1]-new_channel_logo_height-2*h_padding), channel_logo_img) 
+    if channel_logo_path:
+        channel_logo_img = Image.open(channel_logo_path).convert("RGBA")
+        original_channel_logo_width, original_channel_logo_height = channel_logo_img.size
+        new_channel_logo_width = 60
+        new_channel_logo_height = int(original_channel_logo_height * (new_channel_logo_width / original_channel_logo_width))
+        channel_logo_img = channel_logo_img.resize((new_channel_logo_width, new_channel_logo_height), Image.Resampling.LANCZOS)
+        bg_image.paste(channel_logo_img, (channel_logo_x, frame_size[1]-new_channel_logo_height-2*h_padding - channel_logo_y_offset), channel_logo_img) 
 
     # handle logo
     if logo_path:
@@ -91,7 +93,7 @@ def create_image_with_overlay(bg_path, overlay_path, frame_size=(1080, 1920), h_
         # Add text above the logo
         text_width = draw.textlength(logo_top_text, font=font)
         text_position = ((frame_size[0] - text_width) // 2, frame_size[1] - bottom_offset - font_size - 10)
-        draw.text(text_position, logo_top_text, font=font, fill=logo_top_text_color)
+        draw.text(text_position, logo_top_text, font=font, fill=logo_top_text_color, stroke_width=1, stroke_fill='gray')
         
         # Add text below the logo
         text_width = draw.textlength(logo_bottom_text, font=font)
@@ -211,14 +213,18 @@ def add_text_to_image(image_path, output_path, text, position, font_path, font_s
     image.save(output_path)
     # image.show()
 
-def create_code_window_animation(background_image_path, overlay_image_path,font_size=45,
+def create_code_window_animation(background_image_path, overlay_image_path,font_size=45, overlay_shift=0, channel_logo_path="./assets/logo.png", 
+    channel_logo_x = 100, channel_logo_y_offset = 0,
  logo_top_text="", logo_bottom_text="", logo_path=None, logo_size=250, bottom_offset=500, 
- font_path=None, logo_bottom_text_color="green", logo_top_text_color="red"):
+ font_path=None, logo_bottom_text_color="green", logo_top_text_color="red", ):
     images = []
     w_size = 1080
     selected_padding = w_size + 50
     for idx in np.linspace(0, selected_padding, 100):
         img = create_image_with_overlay(background_image_path, overlay_image_path, overlay_shift=(-selected_padding + round(idx)),
+            channel_logo_path=channel_logo_path,
+            channel_logo_x=channel_logo_x,
+            channel_logo_y_offset=channel_logo_y_offset,
             font_path=font_path,
             logo_top_text=logo_top_text, logo_bottom_text=logo_bottom_text, logo_bottom_text_color=logo_bottom_text_color, 
             logo_path=logo_path, logo_size=logo_size, logo_top_text_color=logo_top_text_color, font_size=font_size, bottom_offset=(round(idx)-selected_padding+bottom_offset))
@@ -344,3 +350,24 @@ def generate_final_video(video_name, video_list, audio_path=None, save_video=Fal
         final_video.write_videofile(video_name, codec='libx264', audio_codec='aac')
 
     return final_video
+
+def get_random_background(folder_path):
+    # List all files in the folder
+    files = os.listdir(folder_path)
+    # Filter only image files (you can adjust the image extensions as needed)
+    image_files = [file for file in files if file.endswith((".jpg", ".jpeg", ".png", ".gif"))]
+    # Select a random image file
+    if image_files:
+        return os.path.join(folder_path, random.choice(image_files))
+    else:
+        return None
+def get_random_audio(folder_path):
+    # List all files in the folder
+    files = os.listdir(folder_path)
+    # Filter only image files (you can adjust the image extensions as needed)
+    audio_files = [file for file in files if file.endswith((".mp3"))]
+    # Select a random image file
+    if audio_files:
+        return os.path.join(folder_path, random.choice(audio_files))
+    else:
+        return None
